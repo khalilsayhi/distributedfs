@@ -7,66 +7,54 @@ import (
 	"testing"
 )
 
-func TestKeyTransformFunc(t *testing.T) {
-	key := "mybestpicture"
-	pathname := CASKeyTransformFunc(key)
-	fmt.Println(pathname)
-}
-
 func TestStore(t *testing.T) {
-	opts := StoreOpts{
-		KeyTransformeFunc: CASKeyTransformFunc,
-	}
-	store := NewStore(
-		opts,
-	)
+	store := newStore()
+	defer teardown(t, store)
 
-	key := "mybestpicture"
-	data := []byte("test data")
-	err := store.writeSteam(key, bytes.NewReader(data))
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+	for i := 0; i < 50; i++ {
+		key := fmt.Sprintf("key_%d", i)
+		data := []byte("test data")
 
-	if !store.HasKey(key) {
-		t.Errorf("expected key %s to exist", key)
-	}
+		err := store.writeSteam(key, bytes.NewReader(data))
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
 
-	readData, err := store.Read(key)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+		if !store.HasKey(key) {
+			t.Errorf("expected key %s to exist", key)
+		}
 
-	b, err := io.ReadAll(readData)
-	if string(b) != string(data) {
-		t.Errorf("expected %s, got %s", data, b)
-	}
+		readData, err := store.Read(key)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
 
-	if err = store.Delete(key); err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if store.HasKey(key) {
-		t.Errorf("expected key %s to not exist", key)
+		b, err := io.ReadAll(readData)
+		if string(b) != string(data) {
+			t.Errorf("expected %s, got %s", data, b)
+		}
+
+		if err = store.Delete(key); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+
+		if store.HasKey(key) {
+			t.Errorf("expected key %s to not exist", key)
+		}
 	}
 }
 
-func TestDelete(t *testing.T) {
+func newStore() *Store {
 	opts := StoreOpts{
 		KeyTransformeFunc: CASKeyTransformFunc,
 	}
-	store := NewStore(
+	return NewStore(
 		opts,
 	)
+}
 
-	key := "mybestpicture"
-	data := []byte("test data")
-	err := store.writeSteam(key, bytes.NewReader(data))
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-
-	err = store.Delete(key)
-	if err != nil {
+func teardown(t *testing.T, store *Store) {
+	if err := store.Clear(); err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
 }
