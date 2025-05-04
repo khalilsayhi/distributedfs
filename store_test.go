@@ -15,7 +15,7 @@ func TestStore(t *testing.T) {
 		key := fmt.Sprintf("key_%d", i)
 		data := []byte("test data")
 
-		err := store.writeSteam(key, bytes.NewReader(data))
+		_, err := store.writeSteam(key, bytes.NewReader(data))
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -24,7 +24,7 @@ func TestStore(t *testing.T) {
 			t.Errorf("expected key %s to exist", key)
 		}
 
-		readData, err := store.Read(key)
+		_, readData, err := store.Read(key)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}

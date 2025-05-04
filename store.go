@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -111,28 +110,24 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(path.Join(s.Root, pathKey.FirstParentPath()))
 }
 
-func (s *Store) Read(key string) (io.Reader, error) {
-	f, err := s.readStream(key)
-	if err != nil {
-		return nil, err
-	}
-	defer func(f io.ReadCloser) {
-		err := f.Close()
-		if err != nil {
-			log.Printf("Error closing file: %v", err)
-		}
-	}(f)
-
-	buf := new(bytes.Buffer)
-
-	_, err = io.Copy(buf, f)
-
-	return buf, err
+func (s *Store) Read(key string) (int64, io.Reader, error) {
+	return s.readStream(key)
 }
 
-func (s *Store) readStream(key string) (io.ReadCloser, error) {
+func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	pathKey := s.KeyTransformeFunc(key)
-	return os.Open(pathKey.FullPathWithRoot(s.Root))
+
+	file, err := os.Open(pathKey.FullPathWithRoot(s.Root))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	fi, err := file.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return fi.Size(), file, nil
 }
 
 func (s *Store) writeSteam(key string, r io.Reader) (int64, error) {

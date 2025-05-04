@@ -62,7 +62,8 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	/*	data := bytes.NewReader([]byte("my big data is here"))
-		s2.Store("myprivatedata", data)*/
+		s2.Store("myprivatedata", data)
+	*/
 
 	r, err := s2.Get("myprivatedata")
 	if err != nil {
@@ -74,6 +75,4 @@ func main() {
 	}
 	log.Printf("File content: %s", string(b))
 	log.Printf("File retrieved successfully")
-	select {}
-
 }
