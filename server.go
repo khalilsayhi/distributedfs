@@ -54,15 +54,6 @@ type MessageGetFile struct {
 	Key string
 }
 
-func (fs *FileServer) stream(msg *Message) error {
-	var peers []io.Writer
-	for _, peer := range fs.peers {
-		peers = append(peers, peer)
-	}
-	mw := io.MultiWriter(peers...)
-	return gob.NewEncoder(mw).Encode(msg)
-}
-
 func (fs *FileServer) broadcast(msg *Message) error {
 	buf := new(bytes.Buffer)
 
@@ -94,7 +85,7 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 	}
 	msg := Message{
 		Payload: MessageGetFile{
-			Key: key,
+			Key: hashKey(key),
 		},
 	}
 	if err := fs.broadcast(&msg); err != nil {
@@ -113,7 +104,8 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		if err := binary.Read(peer, binary.LittleEndian, &fileSize); err != nil {
 			return nil, err
 		}
-		n, err := fs.store.Write(key, io.LimitReader(peer, fileSize))
+
+		n, err := fs.store.WriteDecrypt(fs.EncKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +152,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 
 	msg := Message{
 		Payload: MessageStoreFile{
-			Key:  key,
+			Key:  hashKey(key),
 			Size: size + 16,
 		},
 	}
@@ -169,18 +161,30 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	}
 
 	time.Sleep(5 * time.Millisecond)
+	var peers []io.Writer
 	for _, peer := range fs.peers {
+		peers = append(peers, peer)
+	}
+	mw := io.MultiWriter(peers...)
+	_, err = mw.Write([]byte{p2p.IncomingStream})
+	if err != nil {
+		return err
+	}
+	n, err := copyEncrypt(fs.EncKey, fileBuffer, mw)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("[%s] received and wrote (%d) bytes to disk: \n", fs.Transport.Addr(), n)
+	/*	for _, peer := range fs.peers {
 		_ = peer.Send([]byte{p2p.IncomingStream})
-		n, err := copyEncrypt(fs.EncKey, fileBuffer, peer)
+
+		n, err := io.Copy(peer, fileBuffer)
 		if err != nil {
 			return err
 		}
-		/*n, err := io.Copy(peer, fileBuffer)
-		if err != nil {
-			return err
-		}*/
-		fmt.Printf("[%s] received and wrote (%d) bytes to disk: \n", fs.Transport.Addr(), n)
-	}
+	}*/
+
 	return nil
 }
 
@@ -298,6 +302,7 @@ func (fs *FileServer) bootstrapNetwork() error {
 			continue
 		}
 		go func(addr string) {
+			fmt.Printf("[%s] dialing %s\n", fs.Transport.Addr(), addr)
 			if err := fs.Transport.Dial(addr); err != nil {
 				log.Printf("Dial error: %s\n", err)
 			}

@@ -14,6 +14,9 @@ import (
 	"strings"
 )
 
+// filename => example.txt
+// path => TransformFunc(filename) => ROOT/example/txt => 0/1/2/3/4/5/6/7/8/9/a/b/c/d/e/f
+
 const DefaultStoreRoot = "khalilnetwork"
 
 func CASKeyTransformFunc(key string) PathKey {
@@ -82,6 +85,7 @@ func NewStore(opts StoreOpts) *Store {
 	if len(opts.Root) == 0 {
 		opts.Root = DefaultStoreRoot
 	}
+
 	return &Store{
 		StoreOpts: opts,
 	}
@@ -90,6 +94,27 @@ func NewStore(opts StoreOpts) *Store {
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeSteam(key, r)
 }
+
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(key)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := copyDecrypt(encKey, r, f)
+
+	return int64(n), err
+}
+
+func (s *Store) writeSteam(key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(key)
+	if err != nil {
+		return 0, err
+	}
+
+	return io.Copy(f, r)
+}
+
 func (s *Store) HasKey(key string) bool {
 	pathKey := s.KeyTransformeFunc(key)
 	_, err := os.Stat(pathKey.FullPathWithRoot(s.Root))
@@ -130,22 +155,12 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	return fi.Size(), file, nil
 }
 
-func (s *Store) writeSteam(key string, r io.Reader) (int64, error) {
+func (s *Store) openFileForWriting(key string) (*os.File, error) {
 	pathKey := s.KeyTransformeFunc(key)
 	pathNameWithRoot := path.Join(s.Root, pathKey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	f, err := os.Create(pathKey.FullPathWithRoot(s.Root))
-	if err != nil {
-		return 0, err
-	}
-
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
+	return os.Create(pathKey.FullPathWithRoot(s.Root))
 }
