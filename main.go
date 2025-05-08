@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io"
+	"bytes"
 	"log"
 	"time"
 
@@ -21,6 +21,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 		KeyTransformFunc: CASKeyTransformFunc,
 		Transport:        tcpTransport,
 		BootstrapNodes:   nodes,
+		EncKey:           newEncryptorKey(),
 	}
 
 	s := NewFileServer(fileServerOpts)
@@ -61,18 +62,17 @@ func main() {
 	go s2.Start()
 	time.Sleep(1 * time.Second)
 
-	/*	data := bytes.NewReader([]byte("my big data is here"))
-		s2.Store("myprivatedata", data)
-	*/
+	data := bytes.NewReader([]byte("my big data is here"))
+	s2.Store("myprivatedata", data)
 
-	r, err := s2.Get("myprivatedata")
-	if err != nil {
-		log.Printf("Error getting file: %v", err)
-	}
-	b, err := io.ReadAll(r)
-	if err != nil {
-		log.Printf("Error reading file: %v", err)
-	}
-	log.Printf("File content: %s", string(b))
-	log.Printf("File retrieved successfully")
+	/*	r, err := s2.Get("myprivatedata")
+		if err != nil {
+			log.Printf("Error getting file: %v", err)
+		}
+		b, err := io.ReadAll(r)
+		if err != nil {
+			log.Printf("Error reading file: %v", err)
+		}
+		log.Printf("File content: %s", string(b))
+		log.Printf("File retrieved successfully")*/
 }

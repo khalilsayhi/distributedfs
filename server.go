@@ -18,6 +18,7 @@ type FileServerOpts struct {
 	KeyTransformFunc KeyTransformFunc
 	Transport        p2p.Transport
 	BootstrapNodes   []string
+	EncKey           []byte
 }
 type FileServer struct {
 	FileServerOpts
@@ -160,7 +161,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key:  key,
-			Size: size,
+			Size: size + 16,
 		},
 	}
 	if err := fs.broadcast(&msg); err != nil {
@@ -170,10 +171,14 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	time.Sleep(5 * time.Millisecond)
 	for _, peer := range fs.peers {
 		_ = peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, fileBuffer)
+		n, err := copyEncrypt(fs.EncKey, fileBuffer, peer)
 		if err != nil {
 			return err
 		}
+		/*n, err := io.Copy(peer, fileBuffer)
+		if err != nil {
+			return err
+		}*/
 		fmt.Printf("[%s] received and wrote (%d) bytes to disk: \n", fs.Transport.Addr(), n)
 	}
 	return nil
