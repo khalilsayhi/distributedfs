@@ -54,8 +54,8 @@ func (p PathKey) FirstParentPath() string {
 	return paths[0]
 }
 
-func (p PathKey) FullPathWithRoot(root string) string {
-	return path.Join(root, p.FullPath())
+func (p PathKey) FullPathWithRoot(id, root string) string {
+	return path.Join(root, id, p.FullPath())
 }
 
 func (p PathKey) FullPath() string {
@@ -91,12 +91,12 @@ func NewStore(opts StoreOpts) *Store {
 	}
 }
 
-func (s *Store) Write(key string, r io.Reader) (int64, error) {
-	return s.writeSteam(key, r)
+func (s *Store) Write(id, key string, r io.Reader) (int64, error) {
+	return s.writeSteam(id, key, r)
 }
 
-func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
-	f, err := s.openFileForWriting(key)
+func (s *Store) WriteDecrypt(id string, encKey []byte, key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(id, key)
 	if err != nil {
 		return 0, err
 	}
@@ -106,8 +106,8 @@ func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, err
 	return int64(n), err
 }
 
-func (s *Store) writeSteam(key string, r io.Reader) (int64, error) {
-	f, err := s.openFileForWriting(key)
+func (s *Store) writeSteam(id, key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(id, key)
 	if err != nil {
 		return 0, err
 	}
@@ -115,9 +115,9 @@ func (s *Store) writeSteam(key string, r io.Reader) (int64, error) {
 	return io.Copy(f, r)
 }
 
-func (s *Store) HasKey(key string) bool {
+func (s *Store) HasKey(id, key string) bool {
 	pathKey := s.KeyTransformeFunc(key)
-	_, err := os.Stat(pathKey.FullPathWithRoot(s.Root))
+	_, err := os.Stat(pathKey.FullPathWithRoot(id, s.Root))
 
 	return !errors.Is(err, fs.ErrNotExist)
 }
@@ -126,23 +126,23 @@ func (s *Store) Clear() error {
 	return os.RemoveAll(s.Root)
 }
 
-func (s *Store) Delete(key string) error {
+func (s *Store) Delete(id, key string) error {
 	pathKey := s.KeyTransformeFunc(key)
 	defer func() {
 		log.Printf("Deleted %s", pathKey.FileName)
 	}()
 
-	return os.RemoveAll(path.Join(s.Root, pathKey.FirstParentPath()))
+	return os.RemoveAll(path.Join(s.Root, id, pathKey.FirstParentPath()))
 }
 
-func (s *Store) Read(key string) (int64, io.Reader, error) {
-	return s.readStream(key)
+func (s *Store) Read(id, key string) (int64, io.Reader, error) {
+	return s.readStream(id, key)
 }
 
-func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
+func (s *Store) readStream(id, key string) (int64, io.ReadCloser, error) {
 	pathKey := s.KeyTransformeFunc(key)
 
-	file, err := os.Open(pathKey.FullPathWithRoot(s.Root))
+	file, err := os.Open(pathKey.FullPathWithRoot(id, s.Root))
 	if err != nil {
 		return 0, nil, err
 	}
@@ -155,12 +155,12 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	return fi.Size(), file, nil
 }
 
-func (s *Store) openFileForWriting(key string) (*os.File, error) {
+func (s *Store) openFileForWriting(id, key string) (*os.File, error) {
 	pathKey := s.KeyTransformeFunc(key)
-	pathNameWithRoot := path.Join(s.Root, pathKey.PathName)
+	pathNameWithRoot := path.Join(s.Root, id, pathKey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
 		return nil, err
 	}
 
-	return os.Create(pathKey.FullPathWithRoot(s.Root))
+	return os.Create(pathKey.FullPathWithRoot(id, s.Root))
 }

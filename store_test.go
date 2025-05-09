@@ -9,22 +9,23 @@ import (
 
 func TestStore(t *testing.T) {
 	store := newStore()
+	id := generateID()
 	defer teardown(t, store)
 
 	for i := 0; i < 50; i++ {
 		key := fmt.Sprintf("key_%d", i)
 		data := []byte("test data")
 
-		_, err := store.writeSteam(key, bytes.NewReader(data))
+		_, err := store.writeSteam(id, key, bytes.NewReader(data))
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 
-		if !store.HasKey(key) {
+		if !store.HasKey(id, key) {
 			t.Errorf("expected key %s to exist", key)
 		}
 
-		_, readData, err := store.Read(key)
+		_, readData, err := store.Read(id, key)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -34,11 +35,11 @@ func TestStore(t *testing.T) {
 			t.Errorf("expected %s, got %s", data, b)
 		}
 
-		if err = store.Delete(key); err != nil {
+		if err = store.Delete(id, key); err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
 
-		if store.HasKey(key) {
+		if store.HasKey(id, key) {
 			t.Errorf("expected key %s to not exist", key)
 		}
 	}
